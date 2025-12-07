@@ -1,19 +1,40 @@
-# Operator Blueprints – Revenue Forecast Tool (MVP)
+# Operator Blueprints – Revenue Forecast Tool
 
-Minimalist Operator Dashboard for quickly visualizing revenue growth scenarios.
+A minimalist, operator-grade revenue forecasting web app.
 
-## Tech
+Built as a static web app (HTML + CSS + JS) and deployed on Vercel.
 
-- Pure HTML + CSS + JS
-- Chart.js via CDN
-- No build step, static deploy ready for Vercel
+Use it to:
 
-## Run locally
+- Sanity-check revenue goals
+- See what has to be true to hit a target
+- Align your 90-Day Revenue Engine with real numbers
+- Quickly compare conservative / base / aggressive scenarios
 
-Just open `index.html` in your browser.
+---
 
-## Deploy on Vercel
+## Live App
 
-- Framework preset: **Other**
-- Build command: *(empty)*
-- Output directory: `.`
+> Replace this with your Vercel URL.
+
+**Live URL:** https://YOUR-PROJECT-NAME.vercel.app
+
+---
+
+## Tech Stack
+
+- **Frontend:** Vanilla HTML, CSS, JavaScript
+- **Charts:** [Chart.js](https://www.chartjs.org/) via CDN
+- **Hosting:** Vercel (static deployment – no backend)
+
+No build tools, no frameworks. All logic is in `script.js`.
+
+---
+
+## Project Structure
+
+```text
+.
+├── index.html    # Main page and layout
+├── styles.css    # Minimalist Operator Dashboard styling
+└── script.js     # Forecast logic, chart rendering, CSV export
