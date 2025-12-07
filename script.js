@@ -1,4 +1,5 @@
 let forecastChart = null;
+let lastForecast = null; // for CSV export
 
 function formatCurrency(value) {
   const val = Number.isFinite(value) ? value : 0;
@@ -14,33 +15,74 @@ function formatPercent(value) {
   return `${val.toFixed(1)}%`;
 }
 
-function syncMonthsLabel(value) {
-  const months = Number(value) || 0;
-  const label = document.getElementById("monthsLabel");
-  const summary = document.getElementById("monthsSummary");
-  const text = `${months} month${months === 1 ? "" : "s"}`;
-  label.textContent = text;
-  summary.textContent = text;
+function getUnitWords(unit) {
+  if (unit === "week") return { singular: "week", plural: "weeks", short: "W" };
+  if (unit === "year") return { singular: "year", plural: "years", short: "Y" };
+  return { singular: "month", plural: "months", short: "M" };
 }
 
-function resetDefaults() {
+function syncPeriodsLabel(value) {
+  const periods = Number(value) || 0;
+  const unit = document.getElementById("timeUnit").value;
+  const { singular, plural } = getUnitWords(unit);
+
+  const label = document.getElementById("periodsLabel");
+  const summary = document.getElementById("periodsSummary");
+  const word = periods === 1 ? singular : plural;
+
+  const text = `${periods} ${word}`;
+  label.textContent = text;
+  summary.textContent = `${periods} ${word}`;
+}
+
+function clearOutputs() {
+  // KPIs
+  document.getElementById("baseMRR").textContent = "–";
+  document.getElementById("conservativeMRR").textContent = "–";
+  document.getElementById("aggressiveMRR").textContent = "–";
+  document.getElementById("totalBaseRevenue").textContent = "–";
+  document.getElementById("baseRateLabel").textContent = "–";
+  document.getElementById("conservativeRateLabel").textContent = "–";
+  document.getElementById("aggressiveRateLabel").textContent = "–";
+
+  // Summary
+  const summaryList = document.getElementById("summaryList");
+  summaryList.innerHTML = "";
+  const li = document.createElement("li");
+  li.textContent = "Run a forecast to populate the summary.";
+  summaryList.appendChild(li);
+
+  // Chart
+  if (forecastChart) {
+    forecastChart.destroy();
+    forecastChart = null;
+  }
+
+  lastForecast = null;
+}
+
+function resetInputs() {
   document.getElementById("startRevenue").value = 25000;
   document.getElementById("growthRate").value = 8;
-  document.getElementById("months").value = 12;
-  syncMonthsLabel(12);
-  runForecast();
+  document.getElementById("periodCount").value = 12;
+  document.getElementById("timeUnit").value = "month";
+  document.getElementById("conservativeFactor").value = 0.5;
+  document.getElementById("aggressiveFactor").value = 1.5;
+
+  syncPeriodsLabel(12);
+  clearOutputs();
 }
 
-function buildSeries(startRevenue, monthlyGrowthRate, months, factor) {
+function buildSeries(startRevenue, monthlyGrowthRate, periods, factor, unitShort) {
   const series = [];
   const labels = [];
   const g = (monthlyGrowthRate / 100) * factor;
 
   let current = startRevenue;
-  for (let i = 1; i <= months; i++) {
+  for (let i = 1; i <= periods; i++) {
     current = current * (1 + g);
     series.push(current);
-    labels.push(`M${i}`);
+    labels.push(`${unitShort}${i}`);
   }
 
   return { labels, series, effectiveRate: g * 100 };
@@ -124,39 +166,48 @@ function updateChart(labels, base, conservative, aggressive) {
 function runForecast() {
   const startRevenueInput = document.getElementById("startRevenue");
   const growthRateInput = document.getElementById("growthRate");
-  const monthsInput = document.getElementById("months");
+  const periodsInput = document.getElementById("periodCount");
+  const unitSelect = document.getElementById("timeUnit");
+  const conservativeFactorInput = document.getElementById("conservativeFactor");
+  const aggressiveFactorInput = document.getElementById("aggressiveFactor");
 
   let startRevenue = parseFloat(startRevenueInput.value);
   let growthRate = parseFloat(growthRateInput.value);
-  let months = parseInt(monthsInput.value, 10);
+  let periods = parseInt(periodsInput.value, 10);
+  let conservativeFactor = parseFloat(conservativeFactorInput.value);
+  let aggressiveFactor = parseFloat(aggressiveFactorInput.value);
+  const unit = unitSelect.value;
 
   if (!Number.isFinite(startRevenue) || startRevenue < 0) startRevenue = 0;
   if (!Number.isFinite(growthRate)) growthRate = 0;
-  if (!Number.isFinite(months) || months < 1) months = 1;
+  if (!Number.isFinite(periods) || periods < 1) periods = 1;
 
-  syncMonthsLabel(months);
+  if (!Number.isFinite(conservativeFactor)) conservativeFactor = 0.5;
+  if (!Number.isFinite(aggressiveFactor)) aggressiveFactor = 1.5;
 
-  // If base rate is 0, give a small implied band so the curves are visible
-  if (growthRate === 0) {
-    growthRate = 5;
-  }
+  // Guardrails
+  conservativeFactor = Math.max(0, Math.min(conservativeFactor, 3));
+  aggressiveFactor = Math.max(0, Math.min(aggressiveFactor, 5));
 
-  // Scenario factors
-  const conservativeFactor = 0.5;
-  const aggressiveFactor = 1.5;
+  syncPeriodsLabel(periods);
 
-  const baseData = buildSeries(startRevenue, growthRate, months, 1);
+  // If base rate is 0, don't silently change it – just show flat forecast.
+  const { short, singular, plural } = getUnitWords(unit);
+
+  const baseData = buildSeries(startRevenue, growthRate, periods, 1, short);
   const conservativeData = buildSeries(
     startRevenue,
     growthRate,
-    months,
-    conservativeFactor
+    periods,
+    conservativeFactor,
+    short
   );
   const aggressiveData = buildSeries(
     startRevenue,
     growthRate,
-    months,
-    aggressiveFactor
+    periods,
+    aggressiveFactor,
+    short
   );
 
   const labels = baseData.labels;
@@ -190,19 +241,27 @@ function runForecast() {
   const summaryList = document.getElementById("summaryList");
   summaryList.innerHTML = "";
 
+  const unitWordPlural = periods === 1 ? singular : plural;
+
   const items = [
     `Base: Starting from ${formatCurrency(
       startRevenue
     )} with ${formatPercent(
       growthRate
-    )} monthly growth, you end at ${formatCurrency(baseEnd)} in MRR.`,
-    `Conservative: At half the base growth (${formatPercent(
+    )} ${unitWordPlural} growth, you end at ${formatCurrency(
+      baseEnd
+    )} in recurring revenue.`,
+    `Conservative: At ${formatPercent(
       growthRate * conservativeFactor
-    )}), you end at ${formatCurrency(conservativeEnd)} in MRR.`,
-    `Aggressive: At 1.5× base growth (${formatPercent(
+    )} ${unitWordPlural} growth, you end at ${formatCurrency(
+      conservativeEnd
+    )}.`,
+    `Aggressive: At ${formatPercent(
       growthRate * aggressiveFactor
-    )}), you end at ${formatCurrency(aggressiveEnd)} in MRR.`,
-    `Total base scenario revenue over ${months} months is ${formatCurrency(
+    )} ${unitWordPlural} growth, you end at ${formatCurrency(
+      aggressiveEnd
+    )}.`,
+    `Total base scenario revenue over ${periods} ${unitWordPlural} is ${formatCurrency(
       totalBase
     )}.`,
   ];
@@ -215,10 +274,57 @@ function runForecast() {
 
   // Update chart
   updateChart(labels, baseSeries, conservativeSeries, aggressiveSeries);
+
+  // Store for CSV export
+  lastForecast = {
+    labels,
+    baseSeries,
+    conservativeSeries,
+    aggressiveSeries,
+    unit,
+  };
 }
 
-// Initialize on load
+function downloadCSV() {
+  if (!lastForecast) {
+    alert("Run a forecast first to generate data for export.");
+    return;
+  }
+
+  const { labels, baseSeries, conservativeSeries, aggressiveSeries, unit } =
+    lastForecast;
+  const { singular, plural } = getUnitWords(unit);
+  const header = ["Period", `Base (${singular})`, "Conservative", "Aggressive"];
+
+  const rows = [header.join(",")];
+
+  for (let i = 0; i < labels.length; i++) {
+    const row = [
+      labels[i],
+      Math.round(baseSeries[i] || 0),
+      Math.round(conservativeSeries[i] || 0),
+      Math.round(aggressiveSeries[i] || 0),
+    ];
+    rows.push(row.join(","));
+  }
+
+  const csvContent = rows.join("\n");
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "operator-blueprints-revenue-forecast.csv";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// Initialize on load: set labels and clear outputs, but DO NOT run forecast
 document.addEventListener("DOMContentLoaded", () => {
-  syncMonthsLabel(document.getElementById("months").value);
-  runForecast();
+  const initialPeriods = document.getElementById("periodCount").value;
+  syncPeriodsLabel(initialPeriods);
+  clearOutputs();
 });
+
