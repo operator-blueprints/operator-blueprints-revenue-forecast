@@ -198,9 +198,49 @@ input[type="range"] {
   width: 100%;
   padding: 6px 10px;
   border-radius: var(--radius-md);
-  background: radial-gradient(circle at top left, rgba(51, 65, 85, 0.55), rgba(15, 23, 42, 0.9));
+  background-color: #020617;
   border: 1px solid rgba(148, 163, 184, 0.5);
   color: var(--text-main);
+  font-size: 13px;
+  appearance: none;
+}
+
+.select-input option {
+  background-color: #020617;
+  color: #e5e7eb;
+}
+
+/* Divider & subheading */
+
+.section-subheading {
+  margin: 4px 0 2px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-soft);
+}
+
+.form-divider {
+  height: 1px;
+  margin: 10px 0 6px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(148, 163, 184, 0.5),
+    transparent
+  );
+}
+
+/* Implied revenue row */
+
+.implied-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  background: radial-gradient(circle at top left, rgba(51, 65, 85, 0.55), rgba(15, 23, 42, 0.9));
+  border: 1px solid rgba(148, 163, 184, 0.5);
   font-size: 13px;
 }
 
@@ -245,6 +285,11 @@ input[type="range"] {
 
 .btn-secondary:hover {
   border-color: rgba(148, 163, 184, 0.8);
+}
+
+.btn-xs {
+  padding: 4px 10px;
+  font-size: 10px;
 }
 
 /* Assumption note */
@@ -414,4 +459,3 @@ input[type="range"] {
     height: 220px;
   }
 }
-
