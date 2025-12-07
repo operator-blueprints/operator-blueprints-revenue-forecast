@@ -231,6 +231,35 @@ input[type="range"] {
   );
 }
 
+/* Growth mode row */
+
+.mode-row {
+  display: inline-flex;
+  gap: 8px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(circle at top left, rgba(15, 23, 42, 0.95), rgba(15, 23, 42, 0.8));
+  border: 1px solid rgba(148, 163, 184, 0.6);
+}
+
+.mode-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.mode-option input[type="radio"] {
+  accent-color: var(--accent-strong);
+}
+
+.mode-option span {
+  white-space: nowrap;
+}
+
 /* Implied revenue row */
 
 .implied-row {
