@@ -46,6 +46,24 @@
           <p class="field-hint">Current recurring revenue at the start of the model.</p>
         </div>
 
+        <!-- Growth engine mode -->
+        <div class="form-field">
+          <label>Growth Engine</label>
+          <div class="mode-row">
+            <label class="mode-option">
+              <input type="radio" name="growthMode" value="percent" checked />
+              <span>Percentage</span>
+            </label>
+            <label class="mode-option">
+              <input type="radio" name="growthMode" value="traffic" />
+              <span>Traffic · Conversion · AOV</span>
+            </label>
+          </div>
+          <p class="field-hint">
+            Use a flat % per period or drive the curve from traffic, conversion, and AOV.
+          </p>
+        </div>
+
         <!-- Base growth -->
         <div class="form-field">
           <label for="growthRate">Base Growth Rate per Period</label>
@@ -59,7 +77,9 @@
             />
             <span class="suffix">%</span>
           </div>
-          <p class="field-hint">Net % change per period after churn and downgrades.</p>
+          <p class="field-hint">
+            Used when Growth Engine is set to Percentage. In Traffic mode, this is ignored.
+          </p>
         </div>
 
         <!-- Horizon / N -->
@@ -100,7 +120,7 @@
             value="0.5"
           />
           <p class="field-hint">
-            Multiplier applied to base growth (e.g. 0.5 = half the base growth).
+            Percentage mode: multiplier on growth %. Traffic mode: multiplier on traffic growth.
           </p>
         </div>
 
@@ -113,7 +133,7 @@
             value="1.5"
           />
           <p class="field-hint">
-            Multiplier applied to base growth (e.g. 1.5 = 1.5× the base growth).
+            Percentage mode: multiplier on growth %. Traffic mode: multiplier on traffic growth.
           </p>
         </div>
 
@@ -207,10 +227,10 @@
       <div class="assumption-note">
         <h3>How the model behaves</h3>
         <p>
-          Revenue compounds each period using your base growth rate.
-          Conservative and aggressive scenarios apply the multipliers you set,
-          so one assumption set gives you a clean band of outcomes. Traffic,
-          conversion, and AOV inputs help you anchor the model in reality.
+          Percentage mode compounds revenue each period using your base growth rate.
+          Traffic mode compounds traffic, moves conversion from baseline to target, and
+          multiplies by AOV. Conservative and aggressive scenarios adjust growth multipliers
+          so one assumption set gives you a clean band of outcomes.
         </p>
       </div>
     </section>
