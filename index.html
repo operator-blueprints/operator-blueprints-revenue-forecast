@@ -14,7 +14,7 @@
       <div class="logo-dot"></div>
       <div class="topbar-title-group">
         <h1>Operator Blueprints</h1>
-        <p class="topbar-subtitle">Revenue Forecast Tool · MVP</p>
+        <p class="topbar-subtitle">Revenue Forecast Tool</p>
       </div>
     </div>
     <div class="topbar-right">
@@ -26,11 +26,12 @@
     <!-- INPUTS PANEL -->
     <section class="panel panel-inputs">
       <h2>Assumptions</h2>
-      <p class="panel-subtitle">Adjust your core revenue drivers and run scenarios.</p>
+      <p class="panel-subtitle">Set the core drivers once, then run clean scenarios.</p>
 
       <form id="forecast-form" class="form-grid" onsubmit="event.preventDefault(); runForecast();">
+        <!-- Starting revenue -->
         <div class="form-field">
-          <label for="startRevenue">Starting Monthly Revenue</label>
+          <label for="startRevenue">Starting Recurring Revenue</label>
           <div class="input-prefix">
             <span class="prefix">$</span>
             <input
@@ -42,11 +43,12 @@
               required
             />
           </div>
-          <p class="field-hint">Current monthly revenue you’re starting from.</p>
+          <p class="field-hint">Current recurring revenue at the start of the model.</p>
         </div>
 
+        <!-- Base growth -->
         <div class="form-field">
-          <label for="growthRate">Base Monthly Growth Rate</label>
+          <label for="growthRate">Base Growth Rate per Period</label>
           <div class="input-suffix">
             <input
               type="number"
@@ -57,37 +59,67 @@
             />
             <span class="suffix">%</span>
           </div>
-          <p class="field-hint">Expected net growth per month (after churn).</p>
+          <p class="field-hint">Net % change per period after churn and downgrades.</p>
         </div>
 
+        <!-- Horizon / N -->
         <div class="form-field">
-          <label for="months">Forecast Horizon</label>
+          <label for="periodCount">Number of Periods</label>
           <div class="range-row">
             <input
               type="range"
-              id="months"
+              id="periodCount"
               min="3"
-              max="36"
+              max="60"
               value="12"
-              oninput="syncMonthsLabel(this.value)"
+              oninput="syncPeriodsLabel(this.value)"
             />
-            <span id="monthsLabel">12 months</span>
+            <span id="periodsLabel">12 periods</span>
           </div>
-          <p class="field-hint">How far out you want to see the curve.</p>
+          <p class="field-hint">How many steps you want to see along the curve.</p>
         </div>
 
-        <div class="form-field form-field-inline">
-          <div>
-            <label>Scenario Logic</label>
-            <p class="field-hint">
-              Conservative = 0.5× base growth · Aggressive = 1.5× base growth.
-            </p>
-          </div>
+        <!-- Time unit -->
+        <div class="form-field">
+          <label for="timeUnit">Time Unit</label>
+          <select id="timeUnit" class="select-input" onchange="syncPeriodsLabel(document.getElementById('periodCount').value)">
+            <option value="month" selected>Months</option>
+            <option value="week">Weeks</option>
+            <option value="year">Years</option>
+          </select>
+          <p class="field-hint">Controls whether the forecast runs in months, weeks, or years.</p>
+        </div>
+
+        <!-- Scenario multipliers -->
+        <div class="form-field">
+          <label for="conservativeFactor">Conservative Growth Multiplier</label>
+          <input
+            type="number"
+            id="conservativeFactor"
+            step="0.1"
+            value="0.5"
+          />
+          <p class="field-hint">
+            Multiplier applied to base growth (e.g. 0.5 = half the base growth).
+          </p>
+        </div>
+
+        <div class="form-field">
+          <label for="aggressiveFactor">Aggressive Growth Multiplier</label>
+          <input
+            type="number"
+            id="aggressiveFactor"
+            step="0.1"
+            value="1.5"
+          />
+          <p class="field-hint">
+            Multiplier applied to base growth (e.g. 1.5 = 1.5× the base growth).
+          </p>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="btn-secondary" onclick="resetDefaults()">
-            Reset
+          <button type="button" class="btn-secondary" onclick="resetInputs()">
+            Reset Inputs
           </button>
           <button type="submit" class="btn-primary">
             Run Forecast
@@ -96,11 +128,11 @@
       </form>
 
       <div class="assumption-note">
-        <h3>How this MVP works</h3>
+        <h3>How the model behaves</h3>
         <p>
-          Revenue compounds monthly using your base growth rate. We auto-generate
-          conservative and aggressive curves by scaling the growth rate, so you
-          can see a quick range without over-complicating inputs.
+          Revenue compounds each period using your base growth rate.
+          Conservative and aggressive scenarios apply the multipliers you set,
+          so the same assumption set gives you a clean band of outcomes.
         </p>
       </div>
     </section>
@@ -108,56 +140,66 @@
     <!-- OUTPUT PANEL -->
     <section class="panel panel-output">
       <h2>Forecast Output</h2>
-      <p class="panel-subtitle">Three scenarios. One glance. Operator-ready.</p>
+      <p class="panel-subtitle">Three scenarios. One view. Operator-ready.</p>
 
       <!-- KPI STRIP -->
       <div class="kpi-strip">
         <div class="kpi-card">
-          <p class="kpi-label">Ending MRR · Base</p>
-          <p class="kpi-value" id="baseMRR">$0</p>
-          <p class="kpi-tag">Growth @ <span id="baseRateLabel">0%</span></p>
+          <p class="kpi-label">Ending Recurring Revenue · Base</p>
+          <p class="kpi-value" id="baseMRR">–</p>
+          <p class="kpi-tag">Growth @ <span id="baseRateLabel">–</span></p>
         </div>
         <div class="kpi-card">
-          <p class="kpi-label">Ending MRR · Conservative</p>
-          <p class="kpi-value" id="conservativeMRR">$0</p>
-          <p class="kpi-tag">@ <span id="conservativeRateLabel">0%</span></p>
+          <p class="kpi-label">Ending Recurring Revenue · Conservative</p>
+          <p class="kpi-value" id="conservativeMRR">–</p>
+          <p class="kpi-tag">@ <span id="conservativeRateLabel">–</span></p>
         </div>
         <div class="kpi-card">
-          <p class="kpi-label">Ending MRR · Aggressive</p>
-          <p class="kpi-value" id="aggressiveMRR">$0</p>
-          <p class="kpi-tag">@ <span id="aggressiveRateLabel">0%</span></p>
+          <p class="kpi-label">Ending Recurring Revenue · Aggressive</p>
+          <p class="kpi-value" id="aggressiveMRR">–</p>
+          <p class="kpi-tag">@ <span id="aggressiveRateLabel">–</span></p>
         </div>
         <div class="kpi-card">
           <p class="kpi-label">Total Revenue · Base</p>
-          <p class="kpi-value" id="totalBaseRevenue">$0</p>
-          <p class="kpi-tag"><span id="monthsSummary">0</span> months cumulative</p>
+          <p class="kpi-value" id="totalBaseRevenue">–</p>
+          <p class="kpi-tag"><span id="periodsSummary">0 periods</span> cumulative</p>
         </div>
+      </div>
+
+      <!-- OUTPUT ACTIONS -->
+      <div class="output-actions">
+        <button type="button" class="btn-secondary" onclick="downloadCSV()">
+          Download CSV
+        </button>
       </div>
 
       <!-- CHART -->
       <div class="chart-card">
         <div class="chart-header">
-          <h3>Monthly Revenue Curves</h3>
-          <p>Tracking from month 1 to your selected horizon.</p>
+          <h3>Revenue Curve</h3>
+          <p>Base, conservative, and aggressive scenarios across your time horizon.</p>
         </div>
-        <canvas id="forecastChart"></canvas>
+        <div class="chart-wrapper">
+          <canvas id="forecastChart"></canvas>
+        </div>
       </div>
 
       <!-- TEXTUAL SUMMARY -->
       <div class="summary-card">
         <h3>Scenario Summary</h3>
         <ul id="summaryList" class="summary-list">
-          <!-- Filled by JS -->
+          <li>Run a forecast to populate the summary.</li>
         </ul>
       </div>
     </section>
   </main>
 
   <footer class="footer">
-    <span>Operator Blueprints · Revenue Forecast MVP</span>
+    <span>Operator Blueprints · Revenue Forecast</span>
     <span>Speed is the moat · Precision is the standard</span>
   </footer>
 
   <script src="script.js"></script>
 </body>
 </html>
+
