@@ -17,7 +17,7 @@ Use it to:
 
 > Replace this with your Vercel URL.
 
-**Live URL:** https://YOUR-PROJECT-NAME.vercel.app
+**Live URL:** (https://operator-blueprints-revenue-forecas.vercel.app/)
 
 ---
 
