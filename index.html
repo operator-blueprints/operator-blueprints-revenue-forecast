@@ -26,7 +26,7 @@
     <!-- INPUTS PANEL -->
     <section class="panel panel-inputs">
       <h2>Assumptions</h2>
-      <p class="panel-subtitle">Set the core drivers once, then run clean scenarios.</p>
+      <p class="panel-subtitle">Set the core drivers once, then run scenarios with confidence.</p>
 
       <form id="forecast-form" class="form-grid" onsubmit="event.preventDefault(); runForecast();">
         <!-- Starting revenue -->
@@ -87,7 +87,7 @@
             <option value="week">Weeks</option>
             <option value="year">Years</option>
           </select>
-          <p class="field-hint">Controls whether the forecast runs in months, weeks, or years.</p>
+          <p class="field-hint">Control whether the forecast runs in months, weeks, or years.</p>
         </div>
 
         <!-- Scenario multipliers -->
@@ -117,6 +117,83 @@
           </p>
         </div>
 
+        <!-- Notion-style assumptions -->
+        <div class="form-divider"></div>
+        <h3 class="section-subheading">Traffic · Conversion · AOV (Notion Inputs)</h3>
+
+        <div class="form-field">
+          <label for="traffic">Current Monthly Traffic</label>
+          <input
+            type="number"
+            id="traffic"
+            min="0"
+            step="100"
+            placeholder="5000"
+          />
+          <p class="field-hint">Number of visitors per period (e.g., 5,000).</p>
+        </div>
+
+        <div class="form-field">
+          <label for="trafficGrowth">Expected Traffic Growth % per Period</label>
+          <input
+            type="number"
+            id="trafficGrowth"
+            step="0.1"
+            placeholder="10"
+          />
+          <p class="field-hint">Assumption for traffic growth (e.g., 10 for 10%).</p>
+        </div>
+
+        <div class="form-field">
+          <label for="baselineCR">Baseline Conversion Rate %</label>
+          <input
+            type="number"
+            id="baselineCR"
+            step="0.1"
+            placeholder="2"
+          />
+          <p class="field-hint">Current conversion rate (e.g., 2%).</p>
+        </div>
+
+        <div class="form-field">
+          <label for="targetCR">Target Conversion Rate %</label>
+          <input
+            type="number"
+            id="targetCR"
+            step="0.1"
+            placeholder="3"
+          />
+          <p class="field-hint">Stretch goal after optimization.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="aov">Average Order Value (AOV)</label>
+          <div class="input-prefix">
+            <span class="prefix">$</span>
+            <input
+              type="number"
+              id="aov"
+              min="0"
+              step="1"
+              placeholder="85"
+            />
+          </div>
+          <p class="field-hint">Average order size (e.g., $85).</p>
+        </div>
+
+        <div class="form-field">
+          <label>Implied Current Monthly Revenue</label>
+          <div class="implied-row">
+            <span id="impliedRevenue">–</span>
+            <button type="button" class="btn-secondary btn-xs" onclick="applyImpliedToStart()">
+              Apply to Starting Revenue
+            </button>
+          </div>
+          <p class="field-hint">
+            Calculated from Traffic × Conversion × AOV using baseline conversion.
+          </p>
+        </div>
+
         <div class="form-actions">
           <button type="button" class="btn-secondary" onclick="resetInputs()">
             Reset Inputs
@@ -132,7 +209,8 @@
         <p>
           Revenue compounds each period using your base growth rate.
           Conservative and aggressive scenarios apply the multipliers you set,
-          so the same assumption set gives you a clean band of outcomes.
+          so one assumption set gives you a clean band of outcomes. Traffic,
+          conversion, and AOV inputs help you anchor the model in reality.
         </p>
       </div>
     </section>
@@ -202,4 +280,5 @@
   <script src="script.js"></script>
 </body>
 </html>
+
 
