@@ -70,6 +70,10 @@ function resetInputs() {
   document.getElementById("conservativeFactor").value = 0.5;
   document.getElementById("aggressiveFactor").value = 1.5;
 
+  // Reset growth mode
+  const percentMode = document.querySelector('input[name="growthMode"][value="percent"]');
+  if (percentMode) percentMode.checked = true;
+
   // Notion-style inputs
   const clearIds = ["traffic", "trafficGrowth", "baselineCR", "targetCR", "aov"];
   clearIds.forEach((id) => {
@@ -84,7 +88,7 @@ function resetInputs() {
   clearOutputs();
 }
 
-function buildSeries(startRevenue, growthRate, periods, factor, unitShort) {
+function buildSeriesPercent(startRevenue, growthRate, periods, factor, unitShort) {
   const series = [];
   const labels = [];
   const g = (growthRate / 100) * factor;
@@ -97,6 +101,55 @@ function buildSeries(startRevenue, growthRate, periods, factor, unitShort) {
   }
 
   return { labels, series, effectiveRate: g * 100 };
+}
+
+function computeCagr(start, end, periods) {
+  if (!Number.isFinite(start) || !Number.isFinite(end) || start <= 0 || end <= 0 || periods <= 1) {
+    return 0;
+  }
+  const ratio = end / start;
+  const perPeriod = Math.pow(ratio, 1 / (periods - 1)) - 1;
+  return perPeriod * 100;
+}
+
+function buildSeriesTraffic(params, factor, mode) {
+  const {
+    traffic,
+    trafficGrowth,
+    baselineCR,
+    targetCR,
+    aov,
+    periods,
+    unitShort,
+  } = params;
+
+  const labels = [];
+  const baseSeries = [];
+  const gTraffic = (trafficGrowth / 100) * factor;
+
+  for (let i = 1; i <= periods; i++) {
+    const step = periods > 1 ? (i - 1) / (periods - 1) : 0;
+    const t = traffic * Math.pow(1 + gTraffic, i - 1);
+
+    let cr;
+    if (mode === "base") {
+      cr = baselineCR + (targetCR - baselineCR) * step; // full ramp
+    } else if (mode === "conservative") {
+      cr = baselineCR + (targetCR - baselineCR) * step * 0.5; // half ramp
+    } else {
+      // aggressive
+      const adjStep = Math.min(1, step * 1.5);
+      cr = baselineCR + (targetCR - baselineCR) * adjStep;
+    }
+
+    const customers = t * (cr / 100);
+    const revenue = customers * aov;
+
+    baseSeries.push(revenue);
+    labels.push(`${unitShort}${i}`);
+  }
+
+  return { labels, series: baseSeries };
 }
 
 function updateChart(labels, base, conservative, aggressive) {
@@ -182,6 +235,9 @@ function runForecast() {
   const conservativeFactorInput = document.getElementById("conservativeFactor");
   const aggressiveFactorInput = document.getElementById("aggressiveFactor");
 
+  const mode =
+    document.querySelector('input[name="growthMode"]:checked')?.value || "percent";
+
   let startRevenue = parseFloat(startRevenueInput.value);
   let growthRate = parseFloat(growthRateInput.value);
   let periods = parseInt(periodsInput.value, 10);
@@ -204,31 +260,95 @@ function runForecast() {
 
   const { short, singular, plural } = getUnitWords(unit);
 
-  const baseData = buildSeries(startRevenue, growthRate, periods, 1, short);
-  const conservativeData = buildSeries(
-    startRevenue,
-    growthRate,
-    periods,
-    conservativeFactor,
-    short
-  );
-  const aggressiveData = buildSeries(
-    startRevenue,
-    growthRate,
-    periods,
-    aggressiveFactor,
-    short
-  );
+  let labels = [];
+  let baseSeries = [];
+  let conservativeSeries = [];
+  let aggressiveSeries = [];
+  let baseRate = 0;
+  let consRate = 0;
+  let aggRate = 0;
 
-  const labels = baseData.labels;
-  const baseSeries = baseData.series;
-  const conservativeSeries = conservativeData.series;
-  const aggressiveSeries = aggressiveData.series;
+  if (mode === "percent") {
+    // PERCENTAGE MODE (existing behavior)
+    const baseData = buildSeriesPercent(startRevenue, growthRate, periods, 1, short);
+    const conservativeData = buildSeriesPercent(
+      startRevenue,
+      growthRate,
+      periods,
+      conservativeFactor,
+      short
+    );
+    const aggressiveData = buildSeriesPercent(
+      startRevenue,
+      growthRate,
+      periods,
+      aggressiveFactor,
+      short
+    );
+
+    labels = baseData.labels;
+    baseSeries = baseData.series;
+    conservativeSeries = conservativeData.series;
+    aggressiveSeries = aggressiveData.series;
+
+    baseRate = growthRate;
+    consRate = growthRate * conservativeFactor;
+    aggRate = growthRate * aggressiveFactor;
+  } else {
+    // TRAFFIC · CONVERSION · AOV MODE
+    const traffic = parseFloat(document.getElementById("traffic").value);
+    const trafficGrowth = parseFloat(document.getElementById("trafficGrowth").value || "0");
+    const baselineCR = parseFloat(document.getElementById("baselineCR").value);
+    const targetCR = parseFloat(document.getElementById("targetCR").value);
+    const aov = parseFloat(document.getElementById("aov").value);
+
+    if (
+      !Number.isFinite(traffic) ||
+      !Number.isFinite(baselineCR) ||
+      !Number.isFinite(targetCR) ||
+      !Number.isFinite(aov)
+    ) {
+      alert("In Traffic mode, set Traffic, Baseline Conversion, Target Conversion, and AOV.");
+      return;
+    }
+
+    const params = {
+      traffic,
+      trafficGrowth: Number.isFinite(trafficGrowth) ? trafficGrowth : 0,
+      baselineCR,
+      targetCR,
+      aov,
+      periods,
+      unitShort: short,
+    };
+
+    const baseData = buildSeriesTraffic(params, 1, "base");
+    const conservativeData = buildSeriesTraffic(params, conservativeFactor, "conservative");
+    const aggressiveData = buildSeriesTraffic(params, aggressiveFactor, "aggressive");
+
+    labels = baseData.labels;
+    baseSeries = baseData.series;
+    conservativeSeries = conservativeData.series;
+    aggressiveSeries = aggressiveData.series;
+
+    // Align starting revenue field with traffic model (first period)
+    if (baseSeries.length > 0) {
+      startRevenue = baseSeries[0];
+      startRevenueInput.value = Math.round(startRevenue);
+    }
+
+    const baseEnd = baseSeries[baseSeries.length - 1] || startRevenue;
+    const consEnd = conservativeSeries[conservativeSeries.length - 1] || startRevenue;
+    const aggEnd = aggressiveSeries[aggressiveSeries.length - 1] || startRevenue;
+
+    baseRate = computeCagr(startRevenue, baseEnd, periods);
+    consRate = computeCagr(startRevenue, consEnd, periods);
+    aggRate = computeCagr(startRevenue, aggEnd, periods);
+  }
 
   const baseEnd = baseSeries[baseSeries.length - 1] || 0;
   const conservativeEnd = conservativeSeries[conservativeSeries.length - 1] || 0;
   const aggressiveEnd = aggressiveSeries[aggressiveSeries.length - 1] || 0;
-
   const totalBase = baseSeries.reduce((sum, v) => sum + v, 0);
 
   // Update KPI strip
@@ -240,12 +360,9 @@ function runForecast() {
   document.getElementById("totalBaseRevenue").textContent =
     formatCurrency(totalBase);
 
-  document.getElementById("baseRateLabel").textContent =
-    formatPercent(growthRate);
-  document.getElementById("conservativeRateLabel").textContent =
-    formatPercent(growthRate * conservativeFactor);
-  document.getElementById("aggressiveRateLabel").textContent =
-    formatPercent(growthRate * aggressiveFactor);
+  document.getElementById("baseRateLabel").textContent = formatPercent(baseRate);
+  document.getElementById("conservativeRateLabel").textContent = formatPercent(consRate);
+  document.getElementById("aggressiveRateLabel").textContent = formatPercent(aggRate);
 
   // Update textual summary
   const summaryList = document.getElementById("summaryList");
@@ -254,23 +371,17 @@ function runForecast() {
   const unitWordPlural = periods === 1 ? singular : plural;
 
   const items = [
-    `Base: Starting from ${formatCurrency(
-      startRevenue
-    )} with ${formatPercent(
-      growthRate
-    )} ${unitWordPlural} growth, you end at ${formatCurrency(
+    `Base: Ending at ${formatCurrency(
       baseEnd
-    )} in recurring revenue.`,
-    `Conservative: At ${formatPercent(
-      growthRate * conservativeFactor
-    )} ${unitWordPlural} growth, you end at ${formatCurrency(
+    )} in recurring revenue after ${periods} ${unitWordPlural} (${formatPercent(
+      baseRate
+    )} effective growth per period).`,
+    `Conservative: Ending at ${formatCurrency(
       conservativeEnd
-    )}.`,
-    `Aggressive: At ${formatPercent(
-      growthRate * aggressiveFactor
-    )} ${unitWordPlural} growth, you end at ${formatCurrency(
+    )} (${formatPercent(consRate)} effective growth per period).`,
+    `Aggressive: Ending at ${formatCurrency(
       aggressiveEnd
-    )}.`,
+    )} (${formatPercent(aggRate)} effective growth per period).`,
     `Total base scenario revenue over ${periods} ${unitWordPlural} is ${formatCurrency(
       totalBase
     )}.`,
