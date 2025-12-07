@@ -1,5 +1,6 @@
 let forecastChart = null;
-let lastForecast = null; // for CSV export
+let lastForecast = null;        // for CSV export
+let lastImpliedRevenue = null;  // for applying to starting revenue
 
 function formatCurrency(value) {
   const val = Number.isFinite(value) ? value : 0;
@@ -69,14 +70,24 @@ function resetInputs() {
   document.getElementById("conservativeFactor").value = 0.5;
   document.getElementById("aggressiveFactor").value = 1.5;
 
+  // Notion-style inputs
+  const clearIds = ["traffic", "trafficGrowth", "baselineCR", "targetCR", "aov"];
+  clearIds.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+  const impliedEl = document.getElementById("impliedRevenue");
+  if (impliedEl) impliedEl.textContent = "–";
+  lastImpliedRevenue = null;
+
   syncPeriodsLabel(12);
   clearOutputs();
 }
 
-function buildSeries(startRevenue, monthlyGrowthRate, periods, factor, unitShort) {
+function buildSeries(startRevenue, growthRate, periods, factor, unitShort) {
   const series = [];
   const labels = [];
-  const g = (monthlyGrowthRate / 100) * factor;
+  const g = (growthRate / 100) * factor;
 
   let current = startRevenue;
   for (let i = 1; i <= periods; i++) {
@@ -185,13 +196,12 @@ function runForecast() {
   if (!Number.isFinite(conservativeFactor)) conservativeFactor = 0.5;
   if (!Number.isFinite(aggressiveFactor)) aggressiveFactor = 1.5;
 
-  // Guardrails
+  // Guardrails on multipliers
   conservativeFactor = Math.max(0, Math.min(conservativeFactor, 3));
   aggressiveFactor = Math.max(0, Math.min(aggressiveFactor, 5));
 
   syncPeriodsLabel(periods);
 
-  // If base rate is 0, don't silently change it – just show flat forecast.
   const { short, singular, plural } = getUnitWords(unit);
 
   const baseData = buildSeries(startRevenue, growthRate, periods, 1, short);
@@ -293,7 +303,7 @@ function downloadCSV() {
 
   const { labels, baseSeries, conservativeSeries, aggressiveSeries, unit } =
     lastForecast;
-  const { singular, plural } = getUnitWords(unit);
+  const { singular } = getUnitWords(unit);
   const header = ["Period", `Base (${singular})`, "Conservative", "Aggressive"];
 
   const rows = [header.join(",")];
@@ -321,10 +331,53 @@ function downloadCSV() {
   URL.revokeObjectURL(url);
 }
 
+function updateImpliedRevenue() {
+  const trafficEl = document.getElementById("traffic");
+  const baselineCREl = document.getElementById("baselineCR");
+  const aovEl = document.getElementById("aov");
+  const impliedEl = document.getElementById("impliedRevenue");
+
+  if (!trafficEl || !baselineCREl || !aovEl || !impliedEl) return;
+
+  const traffic = parseFloat(trafficEl.value);
+  const conv = parseFloat(baselineCREl.value);
+  const aov = parseFloat(aovEl.value);
+
+  if (!Number.isFinite(traffic) || !Number.isFinite(conv) || !Number.isFinite(aov)) {
+    impliedEl.textContent = "–";
+    lastImpliedRevenue = null;
+    return;
+  }
+
+  const customers = traffic * (conv / 100);
+  const revenue = customers * aov;
+
+  lastImpliedRevenue = revenue;
+  impliedEl.textContent = formatCurrency(revenue);
+}
+
+function applyImpliedToStart() {
+  if (!Number.isFinite(lastImpliedRevenue)) {
+    alert("Set Traffic, Baseline Conversion, and AOV first.");
+    return;
+  }
+  const startInput = document.getElementById("startRevenue");
+  startInput.value = Math.round(lastImpliedRevenue);
+}
+
 // Initialize on load: set labels and clear outputs, but DO NOT run forecast
 document.addEventListener("DOMContentLoaded", () => {
-  const initialPeriods = document.getElementById("periodCount").value;
-  syncPeriodsLabel(initialPeriods);
+  const periodsInput = document.getElementById("periodCount");
+  if (periodsInput) {
+    syncPeriodsLabel(periodsInput.value);
+  }
   clearOutputs();
-});
 
+  // Hook Notion-style inputs to implied revenue calculator
+  ["traffic", "baselineCR", "aov"].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener("input", updateImpliedRevenue);
+    }
+  });
+});
